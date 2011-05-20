@@ -23,6 +23,7 @@ static struct {
 	char pass[128];
 	char db[128];
 	MYSQL mysql;
+	uint32_t version;  /* SER Version, e.g. 1, 2 or 3 */
 } my;
 
 
@@ -103,10 +104,23 @@ static int accounts_getall(const char *realm, restund_db_account_h *acch,
 	if (!realm || !acch)
 		return EINVAL;
 
-	err = query(&res,
-		    "SELECT auth_username, ha1 "
-		    "FROM credentials WHERE realm = '%s';",
-		    realm);
+	switch (my.version) {
+
+	case 2:
+		err = query(&res,
+			    "SELECT auth_username, ha1 "
+			    "FROM credentials WHERE realm = '%s';",
+			    realm);
+		break;
+
+	default:
+		err = query(&res,
+			    "SELECT username, ha1 "
+			    "FROM subscriber where domain = '%s';",
+			    realm);
+		break;
+	}
+
 	if (err) {
 		restund_warning("mysql: unable to select accounts: %s\n",
 				mysql_error(&my.mysql));
@@ -138,9 +152,23 @@ static int accounts_count(const char *realm, uint32_t *n)
 	if (!realm || !n)
 		return EINVAL;
 
-	err = query(&res,
-		    "SELECT COUNT(*) FROM credentials WHERE realm = '%s';",
-		    realm);
+	switch (my.version) {
+
+	case 2:
+		err = query(&res,
+			    "SELECT COUNT(*) "
+			    "FROM credentials WHERE realm = '%s';",
+			    realm);
+		break;
+
+	default:
+		err = query(&res,
+			    "SELECT COUNT(*) "
+			    "FROM subscriber where domain = '%s';",
+			    realm);
+		break;
+	}
+
 	if (err) {
 		restund_warning("mysql: unable to select nr of accounts: %s\n",
 				mysql_error(&my.mysql));
@@ -171,6 +199,7 @@ static int module_init(void)
 	conf_get_str(restund_conf(), "mysql_user", my.user, sizeof(my.user));
 	conf_get_str(restund_conf(), "mysql_pass", my.pass, sizeof(my.pass));
 	conf_get_str(restund_conf(), "mysql_db",   my.db,   sizeof(my.db));
+	conf_get_u32(restund_conf(), "mysql_ser", &my.version);
 
 	if (myconnect()) {
 		restund_error("mysql: %s\n", mysql_error(&my.mysql));

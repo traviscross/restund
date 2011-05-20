@@ -27,9 +27,9 @@ static struct list lstnrl;   /**< List of TCP Sockets (struct tcp_lstnr) */
 static struct list tcl;      /**< List of TCP connections (struct conn)  */
 
 
-static void conn_destructor(void *data)
+static void conn_destructor(void *arg)
 {
-	struct conn *conn = data;
+	struct conn *conn = arg;
 
 	list_unlink(&conn->le);
 	conn->tc = mem_deref(conn->tc);

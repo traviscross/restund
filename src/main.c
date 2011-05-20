@@ -203,10 +203,11 @@ int main(int argc, char *argv[])
 	if (daemon) {
 		err = sys_daemon();
 		if (err) {
-			restund_log_enable_stderr(true);
 			restund_error("daemon error: %s\n", strerror(err));
 			goto out;
  		}
+
+		restund_log_enable_stderr(false);
 	}
 
 	/* database */
