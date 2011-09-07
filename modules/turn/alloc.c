@@ -89,10 +89,28 @@ static void udp_recv(const struct sa *src, struct mbuf *mb, void *arg)
 
 	chan = chan_peer_find(al->chans, src);
 	if (chan) {
+		uint16_t len = mbuf_get_left(mb);
+		size_t start;
+
 		mb->pos -= 4;
+		start = mb->pos;
+
 		(void)mbuf_write_u16(mb, htons(chan_numb(chan)));
-		(void)mbuf_write_u16(mb, htons(mbuf_get_left(mb) - 2));
-		mb->pos -= 4;
+		(void)mbuf_write_u16(mb, htons(len));
+
+		if (al->proto == IPPROTO_TCP) {
+
+			mb->pos = mb->end;
+
+			/* padding */
+			while (len++ & 0x03) {
+				err = mbuf_write_u8(mb, 0x00);
+				if (err)
+					goto out;
+			}
+		}
+
+		mb->pos = start;
 		err = stun_send(al->proto, al->cli_sock, &al->cli_addr, mb);
 		mb->pos += 4;
 	}
@@ -104,6 +122,7 @@ static void udp_recv(const struct sa *src, struct mbuf *mb, void *arg)
 				      STUN_ATTR_DATA, mb);
 	}
 
+ out:
 	if (err)
 		turndp()->errc_rx++;
 	else {

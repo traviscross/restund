@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <time.h>
 #include <re.h>
 #include <restund.h>
 #include "stund.h"
@@ -14,17 +15,22 @@ struct tcp_lstnr {
 	struct le le;
 	struct sa bnd_addr;
 	struct tcp_sock *ts;
+	struct tls *tls;
 };
 
-/** Defines a TCP connection */
 struct conn {
-	struct le le;         /**< Linked list element          */
-	struct tcp_conn *tc;  /**< TCP Connection               */
+	struct le le;
+	struct sa laddr;
+	struct sa paddr;
+	struct tcp_conn *tc;
+	struct tls_conn *tlsc;
+	struct mbuf *mb;
+	time_t created;
 };
 
 
-static struct list lstnrl;   /**< List of TCP Sockets (struct tcp_lstnr) */
-static struct list tcl;      /**< List of TCP connections (struct conn)  */
+static struct list lstnrl;
+static struct list tcl;
 
 
 static void conn_destructor(void *arg)
@@ -32,36 +38,84 @@ static void conn_destructor(void *arg)
 	struct conn *conn = arg;
 
 	list_unlink(&conn->le);
-	conn->tc = mem_deref(conn->tc);
-
-	/* TODO explicit delete TURN mapping here */
+	tcp_set_handlers(conn->tc, NULL, NULL, NULL, NULL);
+	mem_deref(conn->tlsc);
+	mem_deref(conn->tc);
+	mem_deref(conn->mb);
 }
 
 
-static struct conn *conn_alloc(void)
-{
-	struct conn *conn;
-
-	conn = mem_zalloc(sizeof(*conn), conn_destructor);
-	if (!conn)
-		return NULL;
-
-	list_append(&tcl, &conn->le, conn);
-
-	return conn;
-}
-
-
-/* todo: buffering */
 static void tcp_recv(struct mbuf *mb, void *arg)
 {
 	struct conn *conn = arg;
-	struct sa local, peer;
+	int err = 0;
 
-	(void)tcp_conn_local_get(conn->tc, &local);
-	(void)tcp_conn_peer_get(conn->tc, &peer);
+	if (conn->mb) {
+		size_t pos;
 
-	restund_process_msg(IPPROTO_TCP, conn->tc, &peer, &local, mb);
+		pos = conn->mb->pos;
+
+		conn->mb->pos = conn->mb->end;
+
+		err = mbuf_write_mem(conn->mb, mbuf_buf(mb),mbuf_get_left(mb));
+		if (err)
+			goto out;
+
+		conn->mb->pos = pos;
+	}
+	else {
+		conn->mb = mem_ref(mb);
+	}
+
+	for (;;) {
+
+		size_t len, pos, end;
+		uint16_t typ;
+
+		if (mbuf_get_left(conn->mb) < 4)
+			break;
+
+		typ = ntohs(mbuf_read_u16(conn->mb));
+		len = ntohs(mbuf_read_u16(conn->mb));
+
+		if (typ < 0x4000)
+			len += STUN_HEADER_SIZE;
+		else if (typ < 0x8000)
+			len += 4;
+		else {
+			err = EBADMSG;
+			goto out;
+		}
+
+		conn->mb->pos -= 4;
+
+		if (mbuf_get_left(conn->mb) < len)
+			break;
+
+		pos = conn->mb->pos;
+		end = conn->mb->end;
+
+		conn->mb->end = pos + len;
+
+		restund_process_msg(IPPROTO_TCP, conn->tc, &conn->paddr,
+				    &conn->laddr, conn->mb);
+
+		/* 4 byte alignment */
+		while (len & 0x03)
+			++len;
+
+		conn->mb->pos = pos + len;
+		conn->mb->end = end;
+
+		if (conn->mb->pos >= conn->mb->end) {
+			conn->mb = mem_deref(conn->mb);
+			break;
+		}
+	}
+
+ out:
+	if (err)
+		conn->mb = mem_deref(conn->mb);
 }
 
 
@@ -69,33 +123,82 @@ static void tcp_close(int err, void *arg)
 {
 	struct conn *conn = arg;
 
-	(void)err;
-
-	restund_info("TCP close: (%s)\n", strerror(err));
+	restund_debug("tcp: connection closed: %s\n", strerror(err));
 
 	mem_deref(conn);
 }
 
 
+static inline uint32_t refc_idle(struct conn *conn)
+{
+	return conn->tlsc ? 2 : 1;
+}
+
+
 static void tcp_conn_handler(const struct sa *peer, void *arg)
 {
+	const time_t now = time(NULL);
 	struct tcp_lstnr *tl = arg;
-	struct conn *conn;
+	struct conn *conn, *xconn;
 	int err;
 
-	restund_info("TCP connect: peer=%J\n", peer);
+	restund_debug("tcp: connect from: %J\n", peer);
 
-	conn = conn_alloc();
-	if (!conn) {
-		restund_warning("tcp conn: conn_alloc() failed\n");
-		return;
+	/* close oldest connection, if not in use */
+	xconn = list_ledata(tcl.head);
+	if (xconn && mem_nrefs(xconn->tc) <= refc_idle(xconn) &&
+	    now > xconn->created + 60) {
+		restund_debug("tcp: closing unused connection\n");
+		mem_deref(xconn);
 	}
 
-	err = tcp_accept(&conn->tc, tl->ts, NULL, tcp_recv, tcp_close,
-			 conn);
+	conn = mem_zalloc(sizeof(*conn), conn_destructor);
+	if (!conn) {
+		err = ENOMEM;
+		goto out;
+	}
+
+	list_append(&tcl, &conn->le, conn);
+	conn->created = now;
+	conn->paddr = *peer;
+
+	err = tcp_accept(&conn->tc, tl->ts, NULL, tcp_recv, tcp_close, conn);
+	if (err)
+		goto out;
+
+	err = tcp_conn_local_get(conn->tc, &conn->laddr);
+	if (err)
+		goto out;
+
+#ifdef USE_TLS
+	if (tl->tls) {
+		err = tls_start_tcp(&conn->tlsc, tl->tls, conn->tc);
+		if (err)
+			goto out;
+	}
+#endif
+
+ out:
 	if (err) {
-		restund_warning("tcp conn: tcp_accept() %s\n", strerror(err));
+		restund_warning("tcp: unable to accept: %s\n", strerror(err));
+		tcp_reject(tl->ts);
 		mem_deref(conn);
+	}
+}
+
+
+static void status_handler(struct mbuf *mb)
+{
+	const time_t now = time(NULL);
+	struct le *le;
+
+	for (le=tcl.head; le; le=le->next) {
+
+		const struct conn *conn = le->data;
+
+		(void)mbuf_printf(mb, "%J - %J %llis\n",
+				  &conn->laddr, &conn->paddr,
+				  now - conn->created);
 	}
 }
 
@@ -105,16 +208,17 @@ static void lstnr_destructor(void *arg)
 	struct tcp_lstnr *tl = arg;
 
 	list_unlink(&tl->le);
-	tl->ts = mem_deref(tl->ts);
+	mem_deref(tl->ts);
+	mem_deref(tl->tls);
 }
 
 
-static int listen_handler(const struct pl *addrport, void *arg)
+static int listen_handler(const struct pl *val, void *arg)
 {
 	struct tcp_lstnr *tl = NULL;
+	bool tls = *((bool *)arg);
 	int err = ENOMEM;
-
-	(void)arg;
+	struct pl ap;
 
 	tl = mem_zalloc(sizeof(*tl), lstnr_destructor);
 	if (!tl) {
@@ -124,9 +228,39 @@ static int listen_handler(const struct pl *addrport, void *arg)
 
 	list_append(&lstnrl, &tl->le, tl);
 
-	err = sa_decode(&tl->bnd_addr, addrport->p, addrport->l);
+	if (tls) {
+#ifdef USE_TLS
+		char certpath[1024];
+		struct pl cert;
+
+		if (re_regex(val->p, val->l, "[^,]+,[^]+", &ap, &cert)) {
+			restund_warning("bad tls_listen directive: '%r'\n",
+					val);
+			err = EINVAL;
+			goto out;
+		}
+
+		(void)pl_strcpy(&cert, certpath, sizeof(certpath));
+
+		err = tls_alloc(&tl->tls, certpath, NULL);
+		if (err) {
+			restund_warning("tls error: %s\n", strerror(err));
+			goto out;
+		}
+#else
+		restund_warning("tls not supported\n");
+		err = EPROTONOSUPPORT;
+		goto out;
+#endif
+	}
+	else {
+		ap = *val;
+	}
+
+	err = sa_decode(&tl->bnd_addr, ap.p, ap.l);
 	if (err || sa_is_any(&tl->bnd_addr) || !sa_port(&tl->bnd_addr)) {
-		restund_warning("bad tcp_listen directive: '%r'\n", addrport);
+		restund_warning("bad %s_listen directive: '%r'\n",
+				tls ? "tls" : "tcp", val);
 		err = EINVAL;
 		goto out;
 	}
@@ -137,7 +271,8 @@ static int listen_handler(const struct pl *addrport, void *arg)
 		goto out;
 	}
 
-	restund_debug("tcp listen: %J\n", &tl->bnd_addr);
+	restund_debug("%s listen: %J\n", tl->tls ? "tls" : "tcp",
+		      &tl->bnd_addr);
 
  out:
 	if (err)
@@ -147,15 +282,32 @@ static int listen_handler(const struct pl *addrport, void *arg)
 }
 
 
+static struct restund_cmdsub cmd_tcp = {
+	.cmdh = status_handler,
+	.cmd  = "tcp",
+};
+
+
 int restund_tcp_init(void)
 {
+	bool tls;
 	int err;
 
 	list_init(&lstnrl);
 	list_init(&tcl);
 
+	restund_cmd_subscribe(&cmd_tcp);
+
 	/* tcp config */
-	err = conf_apply(restund_conf(), "tcp_listen", listen_handler, NULL);
+	tls = false;
+
+	err = conf_apply(restund_conf(), "tcp_listen", listen_handler, &tls);
+	if (err)
+		goto out;
+
+	tls = true;
+
+	err = conf_apply(restund_conf(), "tls_listen", listen_handler, &tls);
 	if (err)
 		goto out;
 
@@ -169,6 +321,7 @@ int restund_tcp_init(void)
 
 void restund_tcp_close(void)
 {
+	restund_cmd_unsubscribe(&cmd_tcp);
 	list_flush(&lstnrl);
 	list_flush(&tcl);
 }

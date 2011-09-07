@@ -9,7 +9,7 @@
 #
 
 VER_MAJOR := 0
-VER_MINOR := 2
+VER_MINOR := 3
 VER_PATCH := 0
 
 PROJECT   := restund

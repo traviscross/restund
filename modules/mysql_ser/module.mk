@@ -12,6 +12,8 @@ ifeq ($(ARCH),x86_64)
 $(MOD)_LFLAGS	+= -L/usr/lib64/mysql
 endif
 
+CFLAGS		+= -I$(SYSROOT)/local/include
+
 ifneq ($(SYSROOT_ALT),)
 CFLAGS		+= -I$(SYSROOT_ALT)/include/mysql5
 $(MOD)_LFLAGS	+= -L$(SYSROOT_ALT)/lib/mysql5/mysql
@@ -20,6 +22,9 @@ $(MOD)_LFLAGS	+= -L$(SYSROOT_ALT)/lib/mysql
 endif
 else
 $(MOD)_LFLAGS	+= -L$(SYSROOT)/lib/mysql
+ifneq ($(shell [ -d $(SYSROOT)/local/lib/mysql ] && echo 1),)
+$(MOD)_LFLAGS	+= -L$(SYSROOT)/local/lib/mysql
+endif
 endif
 
 include mk/mod.mk
