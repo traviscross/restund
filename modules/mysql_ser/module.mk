@@ -9,7 +9,9 @@ $(MOD)_SRCS	+= mysql_ser.c
 $(MOD)_LFLAGS	+= -lmysqlclient
 
 ifeq ($(ARCH),x86_64)
+ifneq ($(shell [ -d /usr/lib64/mysql ] && echo 1),)
 $(MOD)_LFLAGS	+= -L/usr/lib64/mysql
+endif
 endif
 
 CFLAGS		+= -I$(SYSROOT)/local/include

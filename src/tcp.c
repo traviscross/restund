@@ -11,6 +11,11 @@
 #include "stund.h"
 
 
+enum {
+	TCP_MAX_LENGTH = 2048,
+};
+
+
 struct tcp_lstnr {
 	struct le le;
 	struct sa bnd_addr;
@@ -45,6 +50,12 @@ static void conn_destructor(void *arg)
 }
 
 
+static inline uint32_t refc_idle(struct conn *conn)
+{
+	return conn->tlsc ? 2 : 1;
+}
+
+
 static void tcp_recv(struct mbuf *mb, void *arg)
 {
 	struct conn *conn = arg;
@@ -58,8 +69,11 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 		conn->mb->pos = conn->mb->end;
 
 		err = mbuf_write_mem(conn->mb, mbuf_buf(mb),mbuf_get_left(mb));
-		if (err)
+		if (err) {
+			restund_warning("tcp: buffer write error: %s\n",
+					strerror(err));
 			goto out;
+		}
 
 		conn->mb->pos = pos;
 	}
@@ -78,11 +92,18 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 		typ = ntohs(mbuf_read_u16(conn->mb));
 		len = ntohs(mbuf_read_u16(conn->mb));
 
+		if (len > TCP_MAX_LENGTH) {
+			restund_debug("tcp: bad length: %zu\n", len);
+			err = EBADMSG;
+			goto out;
+		}
+
 		if (typ < 0x4000)
 			len += STUN_HEADER_SIZE;
 		else if (typ < 0x8000)
 			len += 4;
 		else {
+			restund_debug("tcp: bad type: 0x%04x\n", typ);
 			err = EBADMSG;
 			goto out;
 		}
@@ -114,8 +135,12 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 	}
 
  out:
-	if (err)
-		conn->mb = mem_deref(conn->mb);
+	if (err) {
+		if (mem_nrefs(conn->tc) <= refc_idle(conn))
+			mem_deref(conn);
+		else
+			conn->mb = mem_deref(conn->mb);
+	}
 }
 
 
@@ -126,12 +151,6 @@ static void tcp_close(int err, void *arg)
 	restund_debug("tcp: connection closed: %s\n", strerror(err));
 
 	mem_deref(conn);
-}
-
-
-static inline uint32_t refc_idle(struct conn *conn)
-{
-	return conn->tlsc ? 2 : 1;
 }
 
 
@@ -172,7 +191,7 @@ static void tcp_conn_handler(const struct sa *peer, void *arg)
 
 #ifdef USE_TLS
 	if (tl->tls) {
-		err = tls_start_tcp(&conn->tlsc, tl->tls, conn->tc);
+		err = tls_start_tcp(&conn->tlsc, tl->tls, conn->tc, 0);
 		if (err)
 			goto out;
 	}
@@ -242,7 +261,7 @@ static int listen_handler(const struct pl *val, void *arg)
 
 		(void)pl_strcpy(&cert, certpath, sizeof(certpath));
 
-		err = tls_alloc(&tl->tls, certpath, NULL);
+		err = tls_alloc(&tl->tls, TLS_METHOD_SSLV23, certpath, NULL);
 		if (err) {
 			restund_warning("tls error: %s\n", strerror(err));
 			goto out;

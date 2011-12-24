@@ -9,7 +9,7 @@
 #
 
 VER_MAJOR := 0
-VER_MINOR := 3
+VER_MINOR := 4
 VER_PATCH := 0
 
 PROJECT   := restund
@@ -33,7 +33,10 @@ include $(LIBRE_MK)
 
 # Optional syslog module
 ifneq ($(OS),win32)
-MODULES   += syslog
+USE_SYSLOG := 1
+endif
+ifneq ($(USE_SYSLOG),)
+MODULES += syslog
 endif
 
 # Optional MySQL client module

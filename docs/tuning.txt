@@ -5,5 +5,5 @@ your socket buffers.
 On Linux this can be done with the following command
 for read and write buffers respectively:
 
-echo 1048575 > /proc/sys/net/core/rmem_max
-echo 1048575 > /proc/sys/net/core/wmem_max
+echo 1048576 > /proc/sys/net/core/rmem_max
+echo 1048576 > /proc/sys/net/core/wmem_max
