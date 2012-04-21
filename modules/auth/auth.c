@@ -11,53 +11,73 @@
 
 
 enum {
-	NONCE_EXPIRY = 3600,
-	NONCE_SIZE   = 16,
-
+	NONCE_EXPIRY   = 3600,
+	NONCE_MAX_SIZE = 48,
+	NONCE_MIN_SIZE = 33,
 };
 
 
 static struct {
 	uint32_t nonce_expiry;
-	uint32_t rand_time;
-	uint32_t rand_addr;
+	uint64_t secret;
 } auth;
 
 
-static const char *mknonce(char *nonce, uint32_t now, const struct sa *src)
+static const char *mknonce(char *nonce, time_t now, const struct sa *src)
 {
-	(void)re_snprintf(nonce, NONCE_SIZE + 1, "%08x%08x",
-			  auth.rand_time ^ now,
-			  auth.rand_addr ^ sa_hash(src, SA_ADDR));
+	uint8_t key[MD5_SIZE];
+	uint64_t nv[3];
+
+	nv[0] = now;
+	nv[1] = auth.secret;
+	nv[2] = sa_hash(src, SA_ADDR);
+
+	md5((uint8_t *)nv, sizeof(nv), key);
+
+	(void)re_snprintf(nonce, NONCE_MAX_SIZE + 1, "%w%llx",
+			  key, sizeof(key), nv[0]);
+
 	return nonce;
 }
 
 
-static bool nonce_validate(char *nonce, uint32_t now, const struct sa *src)
+static bool nonce_validate(char *nonce, time_t now, const struct sa *src)
 {
+	uint8_t nkey[MD5_SIZE], ckey[MD5_SIZE];
+	uint64_t nv[3];
 	struct pl pl;
-	uint32_t v;
-
-	if (strlen(nonce) != NONCE_SIZE) {
-		restund_info("auth: bad nonce length (%u)\n", strlen(nonce));
-		return false;
-	}
+	int64_t age;
+	unsigned i;
 
 	pl.p = nonce;
-	pl.l = 8;
-	v = pl_x32(&pl) ^ auth.rand_time;
+	pl.l = str_len(nonce);
 
-	if (v + auth.nonce_expiry < now) {
-		restund_debug("auth: nonce expired\n");
+	if (pl.l < NONCE_MIN_SIZE || pl.l > NONCE_MAX_SIZE) {
+		restund_info("auth: bad nonce length (%zu)\n", pl.l);
 		return false;
 	}
 
+	for (i=0; i<sizeof(nkey); i++) {
+		nkey[i]  = ch_hex(*pl.p++) << 4;
+		nkey[i] += ch_hex(*pl.p++);
+		pl.l -= 2;
+	}
 
-	pl.p += 8;
-	v = pl_x32(&pl) ^ auth.rand_addr;
+	nv[0] = pl_x64(&pl);
+	nv[1] = auth.secret;
+	nv[2] = sa_hash(src, SA_ADDR);
 
-	if (v != sa_hash(src, SA_ADDR)) {
-		restund_info("auth: bad nonce src address (%j)\n", src);
+	md5((uint8_t *)nv, sizeof(nv), ckey);
+
+	if (memcmp(nkey, ckey, MD5_SIZE)) {
+		restund_info("auth: invalid nonce: %w\n", nkey, sizeof(nkey));
+		return false;
+	}
+
+	age = now - nv[0];
+
+	if (age < 0 || age > auth.nonce_expiry) {
+		restund_debug("auth: nonce expired, age: %lli secs\n", age);
 		return false;
 	}
 
@@ -70,8 +90,8 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 			    const struct stun_msg *msg)
 {
 	struct stun_attr *mi, *user, *realm, *nonce;
-	const uint32_t now = (uint32_t)time(NULL);
-	char nstr[NONCE_SIZE + 1];
+	const time_t now = time(NULL);
+	char nstr[NONCE_MAX_SIZE + 1];
 	int err;
 	(void)dst;
 
@@ -164,8 +184,7 @@ static struct restund_stun stun = {
 static int module_init(void)
 {
 	auth.nonce_expiry = NONCE_EXPIRY;
-	auth.rand_time = rand_u32();
-	auth.rand_addr = rand_u32();
+	auth.secret = rand_u64();
 
 	conf_get_u32(restund_conf(), "auth_nonce_expiry", &auth.nonce_expiry);
 
