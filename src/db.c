@@ -129,8 +129,7 @@ static int sync_credentials(void)
 
 	err = database.db->cnth(database.realm, &n);
 	if (err) {
-		restund_warning("database sync error (cnt): %s\n",
-				strerror(err));
+		restund_warning("database sync error (cnt): %m\n", err);
 		goto out;
 	}
 
@@ -139,15 +138,14 @@ static int sync_credentials(void)
 
 	err = hash_alloc(&ht, sz);
 	if (err) {
-		restund_warning("database: unable to create hashtable: %s\n",
-				strerror(err));
+		restund_warning("database: unable to create hashtable: %m\n",
+				err);
 		goto out;
 	}
 
 	err = database.db->allh(database.realm, account_handler, ht);
 	if (err) {
-		restund_warning("database sync error (all): %s\n",
-				strerror(err));
+		restund_warning("database sync error (all): %m\n", err);
 		goto out;
 	}
 
@@ -370,7 +368,7 @@ int restund_db_init(void)
 
 	err = pthread_create(&database.thread, NULL, database_thread, NULL);
 	if (err) {
-		restund_warning("database thread error: %s\n", strerror(err));
+		restund_warning("database thread error: %m\n", err);
 		return err;
 	}
 

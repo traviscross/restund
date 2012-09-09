@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Creytiv.com
  */
 
-#include <string.h>
 #include <time.h>
 #include <re.h>
 #include <restund.h>
@@ -54,8 +53,7 @@ static void destructor(void *arg)
 				  &perm->al->rel_addr, &perm->peer,
 				  perm->start, time(NULL), &perm->ts);
 	if (err) {
-		restund_warning("traffic log error: %s\n",
-				strerror(err));
+		restund_warning("traffic log error: %m\n", err);
 	}
 }
 
@@ -286,7 +284,7 @@ void createperm_request(struct allocation *al, struct restund_msgctx *ctx,
 				STUN_ATTR_SOFTWARE, restund_software);
  out:
 	if (rerr)
-		restund_warning("turn: createperm reply: %s\n", strerror(err));
+		restund_warning("turn: createperm reply: %m\n", rerr);
 
 	if (err)
 		(void)list_apply(&cp.perml, true, rollback_handler, al);

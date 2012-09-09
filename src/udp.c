@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Creytiv.com
  */
 
-#include <string.h>
 #include <re.h>
 #include <restund.h>
 #include "stund.h"
@@ -45,7 +44,7 @@ static int listen_handler(const struct pl *addrport, void *arg)
 
 	ul = mem_zalloc(sizeof(*ul), destructor);
 	if (!ul) {
-		restund_warning("udp listen error: %s\n", strerror(err));
+		restund_warning("udp listen error: %m\n", err);
 		goto out;
 	}
 
@@ -60,8 +59,7 @@ static int listen_handler(const struct pl *addrport, void *arg)
 
 	err = udp_listen(&ul->us, &ul->bnd_addr, udp_recv, ul);
 	if (err) {
-		restund_warning("udp listen %J: %s\n", &ul->bnd_addr,
-				strerror(err));
+		restund_warning("udp listen %J: %m\n", &ul->bnd_addr, err);
 		goto out;
 	}
 

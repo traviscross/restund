@@ -70,7 +70,7 @@ static bool nonce_validate(char *nonce, time_t now, const struct sa *src)
 	md5((uint8_t *)nv, sizeof(nv), ckey);
 
 	if (memcmp(nkey, ckey, MD5_SIZE)) {
-		restund_info("auth: invalid nonce: %w\n", nkey, sizeof(nkey));
+		restund_debug("auth: invalid nonce (%j)\n", src);
 		return false;
 	}
 
@@ -144,7 +144,8 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 	ctx->keylen = MD5_SIZE;
 
 	if (restund_get_ha1(user->v.username, ctx->key)) {
-		restund_info("auth: unknown user '%s'\n", user->v.username);
+		restund_info("auth: unknown user '%s' (%j)\n",
+			     user->v.username, src);
 		err = stun_ereply(proto, sock, src, 0, msg,
 				  401, "Unauthorized",
 				  NULL, 0, ctx->fp, 3,
@@ -155,7 +156,8 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 	}
 
 	if (stun_msg_chk_mi(msg, ctx->key, ctx->keylen)) {
-		restund_info("auth: bad passwd for '%s'\n", user->v.username);
+		restund_info("auth: bad password for user '%s' (%j)\n",
+			     user->v.username, src);
 		err = stun_ereply(proto, sock, src, 0, msg,
 				  401, "Unauthorized",
 				  NULL, 0, ctx->fp, 3,
@@ -169,7 +171,7 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 
  unauth:
 	if (err) {
-		restund_warning("auth reply error: %s\n", strerror(err));
+		restund_warning("auth reply error: %m\n", err);
 	}
 
 	return true;

@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Creytiv.com
  */
 
-#include <string.h>
 #include <re.h>
 #include <restund.h>
 
@@ -92,7 +91,7 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 
  out:
 	if (err) {
-		restund_warning("binding reply error: %s\n", strerror(err));
+		restund_warning("binding reply error: %m\n", err);
 	}
 
 	return true;

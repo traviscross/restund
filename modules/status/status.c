@@ -149,13 +149,13 @@ static int module_init(void)
 
 	err = udp_listen(&stg.us, &laddr_udp, udp_recv, NULL);
 	if (err) {
-		restund_warning("status: udp_listen: %s\n", strerror(err));
+		restund_warning("status: udp_listen: %m\n", err);
 		goto out;
 	}
 
 	err = httpd_alloc(&stg.httpd, &laddr_http, httpd_handler);
 	if (err) {
-		restund_warning("status: httpd: %s\n", strerror(err));
+		restund_warning("status: httpd: %m\n", err);
 		goto out;
 	}
 

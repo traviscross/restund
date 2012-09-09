@@ -138,7 +138,7 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 
  out:
 	if (err) {
-		restund_warning("turn reply error: %s\n", strerror(err));
+		restund_warning("turn reply error: %m\n", err);
 	}
 
 	return true;
@@ -350,7 +350,7 @@ static int module_init(void)
 
 	err = hash_alloc(&turnd.ht_alloc, bsize);
 	if (err) {
-		restund_error("turnd hash alloc error: %s\n", strerror(err));
+		restund_error("turnd hash alloc error: %m\n", err);
 		goto out;
 	}
 

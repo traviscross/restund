@@ -7,7 +7,6 @@
 #ifdef SOLARIS
 #define __EXTENSIONS__ 1
 #endif
-#include <string.h>
 #ifdef HAVE_GETOPT
 #include <getopt.h>
 #endif
@@ -32,8 +31,8 @@ static void reload_handler(struct mbuf *mb)
 
 	err = conf_alloc(&lconf, configfile);
 	if (err) {
-		restund_error("error loading configuration: %s: %s\n",
-			      configfile, strerror(err));
+		restund_error("error loading configuration: %s: %m\n",
+			      configfile, err);
 		return;
 	}
 
@@ -80,8 +79,8 @@ static int module_handler(const struct pl *val, void *arg)
 
 	err = mod_load(&mod, filepath);
 	if (err) {
-		restund_warning("can't load module %s (%s)\n",
-				filepath, strerror(err));
+		restund_warning("can't load module %s (%m)\n",
+				filepath, err);
 		goto out;
 	}
 
@@ -155,21 +154,21 @@ int main(int argc, char *argv[])
 
 	err = fd_setsize(4096);
 	if (err) {
-		restund_warning("fd_setsize error: %s\n", strerror(err));
+		restund_warning("fd_setsize error: %m\n", err);
 		goto out;
 	}
 
 	err = libre_init();
 	if (err) {
-		restund_error("re init failed: %s\n", strerror(err));
+		restund_error("re init failed: %m\n", err);
 		goto out;
 	}
 
 	/* configuration file */
 	err = conf_alloc(&conf, configfile);
 	if (err) {
-		restund_error("error loading configuration: %s: %s\n",
-			      configfile, strerror(err));
+		restund_error("error loading configuration: %s: %m\n",
+			      configfile, err);
 		goto out;
 	}
 
@@ -203,7 +202,7 @@ int main(int argc, char *argv[])
 	if (daemon) {
 		err = sys_daemon();
 		if (err) {
-			restund_error("daemon error: %s\n", strerror(err));
+			restund_error("daemon error: %m\n", err);
 			goto out;
  		}
 
@@ -213,7 +212,7 @@ int main(int argc, char *argv[])
 	/* database */
 	err = restund_db_init();
 	if (err) {
-		restund_warning("database error: %s\n", strerror(err));
+		restund_warning("database error: %m\n", err);
 		goto out;
 	}
 

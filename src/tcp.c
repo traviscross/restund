@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Creytiv.com
  */
 
-#include <string.h>
 #include <time.h>
 #include <re.h>
 #include <restund.h>
@@ -13,6 +12,7 @@
 
 enum {
 	TCP_MAX_LENGTH = 2048,
+	TCP_MAX_TXQSZ  = 16384,
 };
 
 
@@ -70,8 +70,7 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 
 		err = mbuf_write_mem(conn->mb, mbuf_buf(mb),mbuf_get_left(mb));
 		if (err) {
-			restund_warning("tcp: buffer write error: %s\n",
-					strerror(err));
+			restund_warning("tcp: buffer write error: %m\n", err);
 			goto out;
 		}
 
@@ -148,7 +147,7 @@ static void tcp_close(int err, void *arg)
 {
 	struct conn *conn = arg;
 
-	restund_debug("tcp: connection closed: %s\n", strerror(err));
+	restund_debug("tcp: connection closed: %m\n", err);
 
 	mem_deref(conn);
 }
@@ -185,6 +184,8 @@ static void tcp_conn_handler(const struct sa *peer, void *arg)
 	if (err)
 		goto out;
 
+	tcp_conn_txqsz_set(conn->tc, TCP_MAX_TXQSZ);
+
 	err = tcp_conn_local_get(conn->tc, &conn->laddr);
 	if (err)
 		goto out;
@@ -199,7 +200,7 @@ static void tcp_conn_handler(const struct sa *peer, void *arg)
 
  out:
 	if (err) {
-		restund_warning("tcp: unable to accept: %s\n", strerror(err));
+		restund_warning("tcp: unable to accept: %m\n", err);
 		tcp_reject(tl->ts);
 		mem_deref(conn);
 	}
@@ -241,7 +242,7 @@ static int listen_handler(const struct pl *val, void *arg)
 
 	tl = mem_zalloc(sizeof(*tl), lstnr_destructor);
 	if (!tl) {
-		restund_warning("tcp listen error: %s\n", strerror(err));
+		restund_warning("tcp listen error: %m\n", err);
 		goto out;
 	}
 
@@ -263,7 +264,7 @@ static int listen_handler(const struct pl *val, void *arg)
 
 		err = tls_alloc(&tl->tls, TLS_METHOD_SSLV23, certpath, NULL);
 		if (err) {
-			restund_warning("tls error: %s\n", strerror(err));
+			restund_warning("tls error: %m\n", err);
 			goto out;
 		}
 #else
@@ -286,7 +287,7 @@ static int listen_handler(const struct pl *val, void *arg)
 
 	err = tcp_listen(&tl->ts, &tl->bnd_addr, tcp_conn_handler, tl);
 	if (err) {
-		restund_warning("tcp error: %s\n", strerror(err));
+		restund_warning("tcp error: %m\n", err);
 		goto out;
 	}
 

@@ -14,6 +14,7 @@ enum {
 	PERM_HASH_SIZE = 16,
 	CHAN_HASH_SIZE = 16,
 	PORT_TRY_MAX = 32,
+	TCP_MAX_TXQSZ  = 8192,
 };
 
 
@@ -80,6 +81,14 @@ static void udp_recv(const struct sa *src, struct mbuf *mb, void *arg)
 	struct perm *perm;
 	struct chan *chan;
 	int err;
+
+	if (al->proto == IPPROTO_TCP) {
+
+		if (tcp_conn_txqsz(al->cli_sock) > TCP_MAX_TXQSZ) {
+			++al->dropc_rx;
+			return;
+		}
+	}
 
 	perm = perm_find(al->perms, src);
 	if (!perm) {
@@ -236,7 +245,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 			goto reply;
 		}
 
-		restund_info("turn: allocation mismatch\n");
+		restund_debug("turn: allocation already exists (%J)\n", src);
 		rerr = stun_ereply(proto, sock, src, 0, msg,
 				   437, "Allocation Mismatch",
 				   ctx->key, ctx->keylen, ctx->fp, 1,
@@ -340,7 +349,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 	/* Permissions */
 	err = perm_hash_alloc(&al->perms, PERM_HASH_SIZE);
 	if (err) {
-		restund_warning("turn: perm list alloc: %s\n", strerror(err));
+		restund_warning("turn: perm list alloc: %m\n", err);
 		rerr = stun_ereply(proto, sock, src, 0, msg,
 				   500, "Server Error",
 				   ctx->key, ctx->keylen, ctx->fp, 1,
@@ -351,7 +360,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 	/* Channels */
 	err = chanlist_alloc(&al->chans, CHAN_HASH_SIZE);
 	if (err) {
-		restund_warning("turn: chan list alloc: %s\n", strerror(err));
+		restund_warning("turn: chan list alloc: %m\n", err);
 		rerr = stun_ereply(proto, sock, src, 0, msg,
 				   500, "Server Error",
 				   ctx->key, ctx->keylen, ctx->fp, 1,
@@ -367,7 +376,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 				   NULL);
 
 	if (err) {
-		restund_warning("turn: relay listen: %s\n", strerror(err));
+		restund_warning("turn: relay listen: %m\n", err);
 		rerr = stun_ereply(proto, sock, src, 0, msg,
 				   508, "Insufficient Port Capacity",
 				   ctx->key, ctx->keylen, ctx->fp, 1,
@@ -401,7 +410,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 				STUN_ATTR_SOFTWARE, restund_software);
  out:
 	if (rerr)
-		restund_warning("turn: allocate reply: %s\n", strerror(rerr));
+		restund_warning("turn: allocate reply: %m\n", rerr);
 
 	if (err)
 		mem_deref(al);
@@ -443,6 +452,6 @@ void refresh_request(struct turnd *turnd, struct allocation *al,
 
  out:
 	if (err) {
-		restund_warning("turn: refresh reply: %s\n", strerror(err));
+		restund_warning("turn: refresh reply: %m\n", err);
 	}
 }

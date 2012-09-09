@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Creytiv.com
  */
 
-#include <string.h>
 #include <time.h>
 #include <re.h>
 #include <restund.h>
@@ -304,7 +303,7 @@ void chanbind_request(struct allocation *al, struct restund_msgctx *ctx,
 				STUN_ATTR_SOFTWARE, restund_software);
  out:
 	if (rerr)
-		restund_warning("turn: chanbind reply: %s\n", strerror(err));
+		restund_warning("turn: chanbind reply: %m\n", rerr);
 
 	if (err) {
 		mem_deref(chan);
