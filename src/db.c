@@ -46,6 +46,7 @@ static struct {
 	pthread_t thread;
 	char realm[256];
 	struct restund_db *db;
+	restund_db_auth_h *authh;
 	bool quit;
 	bool run;
 } database = {
@@ -61,6 +62,7 @@ static struct {
 	.thread = 0,
 	.realm  = "myrealm",
 	.db     = NULL,
+	.authh  = NULL,
 	.quit   = false,
 	.run	= false,
 };
@@ -318,6 +320,9 @@ int restund_get_ha1(const char *username, uint8_t *ha1)
 	if (!username || !ha1)
 		return EINVAL;
 
+	if (database.authh && 0 == database.authh(username, ha1))
+		return 0;
+
 	if (!database.run)
 		return ENOENT;
 
@@ -348,6 +353,12 @@ const char *restund_realm(void)
 void restund_db_set_handler(struct restund_db *db)
 {
 	database.db = db;
+}
+
+
+void restund_db_set_auth_handler(restund_db_auth_h *authh)
+{
+	database.authh = authh;
 }
 
 

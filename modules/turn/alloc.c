@@ -1,5 +1,5 @@
 /**
- * @file turn.c Turn Server Allocation
+ * @file alloc.c Turn Server Allocation
  *
  * Copyright (C) 2010 Creytiv.com
  */
@@ -389,7 +389,7 @@ void allocate_request(struct turnd *turnd, struct allocation *alx,
 		(void)udp_sockbuf_set(al->rel_us, turndp()->udp_sockbuf_size);
 
 	restund_debug("turn: allocation %p created %s/%J/%J - %J (%us)\n",
-		      al, net_proto2name(al->proto), &al->cli_addr,
+		      al, stun_transp_name(al->proto), &al->cli_addr,
 		      &al->srv_addr, &al->rel_addr, lifetime);
 
 	alx = al;

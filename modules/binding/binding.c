@@ -28,6 +28,9 @@ static void *get_sock(struct sa *sa, int proto, const struct sa *orig,
 	case IPPROTO_TCP:
 		return restund_tcp_socket(sa, orig, ch_ip, ch_port);
 
+	case STUN_TRANSP_DTLS:
+		return restund_dtls_socket(sa, orig, ch_ip, ch_port);
+
 	default:
 		return 0;
 	}
@@ -123,7 +126,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(binding) = {
 	.name = "binding",
 	.type = "stun",
 	.init = module_init,

@@ -308,6 +308,53 @@
       should be relayed.
 
 
+3.7.  Filedb
+
+   The filedb module implements the database interface specified in
+   section 2.3 for loading user credentials from a file. Traffic logging
+   is not supported by this module. The following configuration options
+   is recognized by the filedb module:
+
+   filedb_path <filename>
+
+      Absolute path to file containing user credentials. The default
+      filename is /etc/restund.auth
+
+
+3.8.  Restauth
+
+   The restauth module implements the REST-based authentication as defined
+   in draft-uberti-behave-turn-rest-00 [REST]. Multiple shared secrets can be
+   configured, and stored in one of the Database backends.
+
+   The script util/genrest.sh can be used to generated REST username
+   and password.
+
+   Example with filedb.so backend:
+
+     user  = test
+     realm = myrealm
+     pass  = secret
+
+   $ echo -n "test:myrealm:secret" | md5
+     8bee32d57ceffaa4cad79064e1264a17
+
+   add this entry to /etc/restund.auth:
+
+     test:8bee32d57ceffaa4cad79064e1264a17
+
+
+   $ ./util/genrest.sh myrealm test 3600 secret
+   username = 1415180577:test
+   password = u8E4rTThLqLYFDi/uRTYU4wtTaM=
+
+   (your output will be different as the time is different)
+   This username/password is valid for 1 hour and can then be passed
+   to the TURN Client.
+
+
+
+
 4.  References
 
    [RFC5389]  Rosenberg, J., Mahy, R., Matthews, P., and D. Wing,
@@ -320,3 +367,6 @@
 
    [RFC5780]  NAT Behavior Discovery Using Session Traversal Utilities for NAT
               (STUN). D. MacDonald, B. Lowekamp. May 2010.
+
+   [REST]     A REST API For Access To TURN Services
+              draft-uberti-behave-turn-rest-00

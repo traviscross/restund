@@ -1,5 +1,5 @@
 /**
- * @file turn.c Turn Server Permission
+ * @file perm.c Turn Server Permission
  *
  * Copyright (C) 2010 Creytiv.com
  */

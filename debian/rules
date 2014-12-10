@@ -10,6 +10,10 @@
 #export DH_VERBOSE=1
 
 
+EXTRA_CFLAGS:="$(shell dpkg-buildflags --get CFLAGS | sed -e 's/-O2//')"
+EXTRA_LFLAGS:="$(shell dpkg-buildflags --get LDFLAGS)"
+
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
@@ -20,22 +24,25 @@ build: build-stamp
 
 build-stamp: configure-stamp 
 	dh_testdir
-	$(MAKE) RELEASE=1
+	$(MAKE) RELEASE=1 \
+		EXTRA_CFLAGS=$(EXTRA_CFLAGS) \
+		EXTRA_LFLAGS=$(EXTRA_LFLAGS)
 	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
-	-$(MAKE) clean
+	$(MAKE) clean
 	dh_clean 
 
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k 
+	dh_prep
 	dh_installdirs
 	$(MAKE) DESTDIR=$(CURDIR)/debian/restund install config
+	sed -i -e 's/usr\/local/usr/' $(CURDIR)/debian/restund/etc/restund.conf
 
 
 # Build architecture-independent files here.
@@ -72,6 +79,10 @@ binary-arch: build install
 	dh_gencontrol
 	dh_md5sums
 	dh_builddeb
+
+build-arch: build
+
+build-indep: build
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install configure

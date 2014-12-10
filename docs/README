@@ -2,7 +2,7 @@ README
 ------
 
 restund - modular STUN/TURN server
-Copyright (c) 2010 - 2012 Creytiv.com
+Copyright (c) 2010 - 2014 Creytiv.com
 
 Distributed under BSD license
 
@@ -32,7 +32,7 @@ Design goals:
 * Modular STUN/TURN server
 * STUN and TURN support
 * IPv4 and IPv6 support
-* UDP, TCP and TLS support
+* UDP, TCP, TLS and DTLS transport support
 * RFC-compliancy
 * Robust, fast, low footprint
 * Portable C89 and C99 source code
@@ -41,7 +41,7 @@ Design goals:
 Modular Plugin Architecture:
 
 * STUN messages:    auth binding stat turn
-* Database backend: mysql_ser
+* Database backend: mysql_ser filedb restauth
 * Server status:    status
 * Logging:          syslog
 
@@ -54,3 +54,5 @@ IETF RFCs:
 * RFC 5780 - NAT Behavior Discovery Using Session Traversal Utilities for
              NAT (STUN)
 * RFC 6156 - Traversal Using Relays around NAT (TURN) Extension for IPv6
+* RFC 7350 - DTLS as Transport for STUN
+* draft-uberti-behave-turn-rest-00

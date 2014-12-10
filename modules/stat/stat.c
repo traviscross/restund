@@ -113,7 +113,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(stat) = {
 	.name  = "stat",
 	.type  = "stun",
 	.init  = module_init,

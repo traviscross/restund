@@ -8,6 +8,11 @@
 #include "httpd.h"
 
 
+enum {
+	TCP_IDLE_TIMEOUT = 600 * 1000,
+};
+
+
 struct conn {
 	struct le le;
 	struct tmr tmr;
@@ -67,7 +72,7 @@ static void recv_handler(struct mbuf *mbrx, void *arg)
 	mb->pos = 0;
 	tcp_send(conn->tc, mb);
 
-	tmr_start(&conn->tmr, 600 * 1000, timeout_handler, conn);
+	tmr_start(&conn->tmr, TCP_IDLE_TIMEOUT, timeout_handler, conn);
  out:
 	mem_deref(mb);
 	mem_deref(body);
@@ -113,7 +118,7 @@ static void connect_handler(const struct sa *peer, void *arg)
 	if (err)
 		goto out;
 
-	tmr_start(&conn->tmr, 5000, timeout_handler, conn);
+	tmr_start(&conn->tmr, TCP_IDLE_TIMEOUT, timeout_handler, conn);
 
  out:
 	if (err) {

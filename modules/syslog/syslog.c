@@ -14,7 +14,7 @@ static const int lmap[] = { LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERR };
 
 static void log_handler(uint32_t level, const char *msg)
 {
-	syslog(lmap[MIN(level, sizeof(lmap - 1))], "%s", msg);
+	syslog(lmap[MIN(level, ARRAY_SIZE(lmap)-1)], "%s", msg);
 }
 
 
@@ -51,7 +51,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(syslog) = {
 	.name = "syslog",
 	.type = "logger",
 	.init = module_init,

@@ -248,7 +248,7 @@ static bool allocation_status(struct le *le, void *arg)
 	(void)mbuf_printf(mb,
 			  "- %04u %s/%J/%J - %J \"%s\" %us (drop %llu/%llu)\n",
 			  sa_hash(&al->cli_addr, SA_ALL) & (bsize - 1),
-			  net_proto2name(al->proto), &al->cli_addr,
+			  stun_transp_name(al->proto), &al->cli_addr,
 			  &al->srv_addr, &al->rel_addr, al->username,
 			  (uint32_t)tmr_get_expire(&al->tmr) / 1000,
 			  al->dropc_tx, al->dropc_rx);
@@ -377,7 +377,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(turn) = {
 	.name = "turn",
 	.type = "stun relay",
 	.init = module_init,

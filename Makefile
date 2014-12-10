@@ -10,12 +10,12 @@
 
 VER_MAJOR := 0
 VER_MINOR := 4
-VER_PATCH := 2
+VER_PATCH := 11
 
 PROJECT   := restund
 VERSION   := $(VER_MAJOR).$(VER_MINOR).$(VER_PATCH)
 
-MODULES	  := binding auth turn stat status
+MODULES	  := binding auth turn stat status filedb restauth
 MODULES	  += $(EXTRA_MODULES)
 
 LIBRE_MK  := $(shell [ -f ../re/mk/re.mk ] && \
@@ -30,6 +30,16 @@ LIBRE_MK  := $(shell [ -f /usr/local/share/re/re.mk ] && \
 endif
 
 include $(LIBRE_MK)
+
+ifeq ($(OS),win32)
+STATIC    := yes
+endif
+
+
+ifneq ($(STATIC),)
+CFLAGS    += -DSTATIC=1
+endif
+
 
 # Optional syslog module
 ifneq ($(OS),win32)
@@ -63,7 +73,9 @@ endif
 MOD_PATH:= $(LIBDIR)/$(PROJECT)/modules
 CFLAGS	+= -I$(LIBRE_INC) -Iinclude
 BIN	:= $(PROJECT)$(BIN_SUFFIX)
-MOD_BINS:= $(patsubst %,%.so,$(MODULES))
+ifeq ($(STATIC),)
+MOD_BINS:= $(patsubst %,%$(MOD_SUFFIX),$(MODULES))
+endif
 APP_MK	:= src/srcs.mk
 MOD_MK	:= $(patsubst %,modules/%/module.mk,$(MODULES))
 MOD_BLD	:= $(patsubst %,$(BUILD)/modules/%,$(MODULES))
@@ -71,7 +83,13 @@ MOD_BLD	:= $(patsubst %,$(BUILD)/modules/%,$(MODULES))
 include $(APP_MK)
 include $(MOD_MK)
 
-OBJS	?= $(patsubst %.c,$(BUILD)/src/%.o,$(SRCS))
+OBJS	+= $(patsubst %.c,$(BUILD)/src/%.o,$(SRCS))
+
+ifneq ($(STATIC),)
+LIBS      += $(MOD_LFLAGS)
+include mk/static.mk
+endif
+
 
 all: $(MOD_BINS) $(BIN)
 
@@ -95,7 +113,7 @@ $(BUILD): Makefile
 	@touch $@
 
 clean:
-	@rm -rf $(BIN) $(MOD_BINS) $(BUILD)/
+	@rm -rf $(BIN) $(MOD_BINS) $(BUILD) src/static.c
 
 install: $(BIN) $(MOD_BINS)
 	@mkdir -p $(DESTDIR)$(SBINDIR)
@@ -108,3 +126,4 @@ install: $(BIN) $(MOD_BINS)
 config:
 	@mkdir -p $(DESTDIR)/etc
 	$(INSTALL) -m 0644 etc/restund.conf $(DESTDIR)/etc/.
+	$(INSTALL) -m 0644 etc/restund.auth $(DESTDIR)/etc/.

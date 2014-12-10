@@ -209,7 +209,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(auth) = {
 	.name  = "auth",
 	.type  = "stun",
 	.init  = module_init,

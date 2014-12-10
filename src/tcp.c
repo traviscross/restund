@@ -11,6 +11,7 @@
 
 
 enum {
+	TCP_IDLE_TIMEOUT   = 600 * 1000,
 	TCP_MAX_LENGTH = 2048,
 	TCP_MAX_TXQSZ  = 16384,
 };
@@ -25,12 +26,15 @@ struct tcp_lstnr {
 
 struct conn {
 	struct le le;
+	struct tmr tmr;
 	struct sa laddr;
 	struct sa paddr;
 	struct tcp_conn *tc;
 	struct tls_conn *tlsc;
 	struct mbuf *mb;
 	time_t created;
+	uint64_t prev_rxc;
+	uint64_t rxc;
 };
 
 
@@ -43,6 +47,7 @@ static void conn_destructor(void *arg)
 	struct conn *conn = arg;
 
 	list_unlink(&conn->le);
+	tmr_cancel(&conn->tmr);
 	tcp_set_handlers(conn->tc, NULL, NULL, NULL, NULL);
 	mem_deref(conn->tlsc);
 	mem_deref(conn->tc);
@@ -50,9 +55,20 @@ static void conn_destructor(void *arg)
 }
 
 
-static inline uint32_t refc_idle(struct conn *conn)
+static void tmr_handler(void *arg)
 {
-	return conn->tlsc ? 2 : 1;
+	struct conn *conn = arg;
+
+	if (conn->rxc == conn->prev_rxc) {
+		restund_debug("tcp: closing idle connection: %J\n",
+			      &conn->paddr);
+		mem_deref(conn);
+		return;
+	}
+
+	conn->prev_rxc = conn->rxc;
+
+	tmr_start(&conn->tmr, TCP_IDLE_TIMEOUT, tmr_handler, conn);
 }
 
 
@@ -120,6 +136,8 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 		restund_process_msg(IPPROTO_TCP, conn->tc, &conn->paddr,
 				    &conn->laddr, conn->mb);
 
+		++conn->rxc;
+
 		/* 4 byte alignment */
 		while (len & 0x03)
 			++len;
@@ -135,10 +153,7 @@ static void tcp_recv(struct mbuf *mb, void *arg)
 
  out:
 	if (err) {
-		if (mem_nrefs(conn->tc) <= refc_idle(conn))
-			mem_deref(conn);
-		else
-			conn->mb = mem_deref(conn->mb);
+		conn->mb = mem_deref(conn->mb);
 	}
 }
 
@@ -157,18 +172,10 @@ static void tcp_conn_handler(const struct sa *peer, void *arg)
 {
 	const time_t now = time(NULL);
 	struct tcp_lstnr *tl = arg;
-	struct conn *conn, *xconn;
+	struct conn *conn;
 	int err;
 
 	restund_debug("tcp: connect from: %J\n", peer);
-
-	/* close oldest connection, if not in use */
-	xconn = list_ledata(tcl.head);
-	if (xconn && mem_nrefs(xconn->tc) <= refc_idle(xconn) &&
-	    now > xconn->created + 60) {
-		restund_debug("tcp: closing unused connection\n");
-		mem_deref(xconn);
-	}
 
 	conn = mem_zalloc(sizeof(*conn), conn_destructor);
 	if (!conn) {
@@ -197,6 +204,8 @@ static void tcp_conn_handler(const struct sa *peer, void *arg)
 			goto out;
 	}
 #endif
+
+	tmr_start(&conn->tmr, TCP_IDLE_TIMEOUT, tmr_handler, conn);
 
  out:
 	if (err) {

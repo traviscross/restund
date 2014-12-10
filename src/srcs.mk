@@ -11,3 +11,8 @@ SRCS	+= main.c
 SRCS	+= stun.c
 SRCS	+= udp.c
 SRCS	+= tcp.c
+SRCS	+= dtls.c
+
+ifneq ($(STATIC),)
+SRCS	+= static.c
+endif

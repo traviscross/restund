@@ -64,6 +64,54 @@ static void signal_handler(int sig)
 }
 
 
+#ifdef STATIC
+
+extern const struct mod_export *mod_table[];
+
+
+static const struct mod_export *find_module(const struct pl *name)
+{
+	uint32_t i;
+
+	for (i=0; mod_table[i]; i++) {
+
+		if (0 == pl_strcasecmp(name, mod_table[i]->name))
+			return mod_table[i];
+	}
+
+	return NULL;
+}
+
+
+static int module_handler(const struct pl *pl, void *arg)
+{
+	const struct mod_export *me;
+	struct pl name;
+	struct mod *m;
+	int err;
+
+	(void)arg;
+
+	if (re_regex(pl->p, pl->l, "[^/.]+.[^]*", &name, NULL))
+		return EINVAL;
+
+	me = find_module(&name);
+	if (!me) {
+		restund_error("can't find module %r\n", &name);
+		return ENOENT;
+	}
+
+	err = mod_add(&m, me);
+	if (err) {
+		restund_error("can't add module %r: %m\n", &name, err);
+		return err;
+	}
+
+	return 0;
+}
+
+#else
+
 static int module_handler(const struct pl *val, void *arg)
 {
 	struct pl *modpath = arg;
@@ -87,6 +135,8 @@ static int module_handler(const struct pl *val, void *arg)
  out:
 	return err;
 }
+
+#endif
 
 
 struct conf *restund_conf(void)
@@ -186,6 +236,11 @@ int main(int argc, char *argv[])
 	if (err)
 		goto out;
 
+	/* dtls */
+	err = restund_dtls_init();
+	if (err)
+		goto out;
+
 	/* daemon config */
 	if (!conf_get(conf, "daemon", &opt) && !pl_strcasecmp(&opt, "no"))
 		daemon = false;
@@ -226,6 +281,7 @@ int main(int argc, char *argv[])
 	mod_close();
 	restund_udp_close();
 	restund_tcp_close();
+	restund_dtls_close();
 	conf = mem_deref(conf);
 
 	libre_close();

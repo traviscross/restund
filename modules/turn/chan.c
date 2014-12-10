@@ -1,5 +1,5 @@
 /**
- * @file turn.c Turn Server Channel
+ * @file chan.c Turn Server Channel
  *
  * Copyright (C) 2010 Creytiv.com
  */

@@ -12,6 +12,10 @@ void restund_udp_close(void);
 int  restund_tcp_init(void);
 void restund_tcp_close(void);
 
+/* dtls */
+int  restund_dtls_init(void);
+void restund_dtls_close(void);
+
 /* stun */
 void restund_process_msg(int proto, void *sock,
 			 const struct sa *src, const struct sa *dst,

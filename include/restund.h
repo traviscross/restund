@@ -89,6 +89,7 @@ struct restund_trafstat {
 };
 
 
+typedef int(restund_db_auth_h)(const char *username, uint8_t *ha1);
 typedef int(restund_db_account_h)(const char *username, const char *ha1,
 				  void *arg);
 typedef int(restund_db_account_all_h)(const char *realm,
@@ -116,6 +117,7 @@ int  restund_log_traffic(const char *username, const struct sa *cli,
 int  restund_get_ha1(const char *username, uint8_t *ha1);
 const char *restund_realm(void);
 void restund_db_set_handler(struct restund_db *db);
+void restund_db_set_auth_handler(restund_db_auth_h *authh);
 
 
 /* div */
@@ -125,3 +127,16 @@ struct udp_sock *restund_udp_socket(struct sa *sa, const struct sa *orig,
 				    bool ch_ip, bool ch_port);
 struct tcp_sock *restund_tcp_socket(struct sa *sa, const struct sa *orig,
 				    bool ch_ip, bool ch_port);
+struct dtls_sock *restund_dtls_socket(struct sa *sa, const struct sa *orig,
+				      bool ch_ip, bool ch_port);
+
+
+/*
+ * Modules
+ */
+
+#ifdef STATIC
+#define DECL_EXPORTS(name) exports_ ##name
+#else
+#define DECL_EXPORTS(name) exports
+#endif

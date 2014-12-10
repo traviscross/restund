@@ -221,7 +221,7 @@ static int module_close(void)
 }
 
 
-const struct mod_export exports = {
+const struct mod_export DECL_EXPORTS(mysql_ser) = {
 	.name = "mysql_ser",
 	.type = "database client",
 	.init = module_init,
