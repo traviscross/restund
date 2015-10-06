@@ -1,3 +1,14 @@
+2015-10-03 Alfred E. Heggestad <aeh@db.org>
+
+	* Version 0.4.12
+
+	* stat: add counter for CreatePermission request
+
+	* turn: strip padding from received channel data messages
+		- this fixes an interop issue with Edge browser
+		- thanks to Philipp Hancke for reporting the issue
+
+
 2014-12-09 Alfred E. Heggestad <aeh@db.org>
 
 	* Version 0.4.11

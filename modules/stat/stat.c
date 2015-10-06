@@ -24,6 +24,7 @@ static struct {
 	uint32_t n_bind_req;
 	uint32_t n_alloc_req;
 	uint32_t n_refresh_req;
+	uint32_t n_createperm_req;
 	uint32_t n_chanbind_req;
 	uint32_t n_unk_req;
 } stat;
@@ -53,6 +54,10 @@ static bool request_handler(struct restund_msgctx *ctx, int proto, void *sock,
 		STAT_INC(n_refresh_req);
 		break;
 
+	case STUN_METHOD_CREATEPERM:
+		STAT_INC(n_createperm_req);
+		break;
+
 	case STUN_METHOD_CHANBIND:
 		STAT_INC(n_chanbind_req);
 		break;
@@ -75,6 +80,7 @@ static void print_stat(struct mbuf *mb)
 	(void)mbuf_printf(mb, "binding_req %u\n", stat.n_bind_req);
 	(void)mbuf_printf(mb, "allocate_req %u\n", stat.n_alloc_req);
 	(void)mbuf_printf(mb, "refresh_req %u\n", stat.n_refresh_req);
+	(void)mbuf_printf(mb, "createperm_req %u\n", stat.n_createperm_req);
 	(void)mbuf_printf(mb, "chanbind_req %u\n", stat.n_chanbind_req);
 	(void)mbuf_printf(mb, "unknown_req %u\n", stat.n_unk_req);
 }

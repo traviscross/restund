@@ -225,6 +225,8 @@ static bool raw_handler(int proto, const struct sa *src,
 		return false;
 	}
 
+	mb->end = mb->pos + len;
+
 	err = udp_send(al->rel_us, chan_peer(chan), mb);
 	if (err)
 		turnd.errc_tx++;

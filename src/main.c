@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
 
 	restund_cmd_subscribe(&cmd_reload);
 
-	err = fd_setsize(4096);
+	err = fd_setsize(1024);
 	if (err) {
 		restund_warning("fd_setsize error: %m\n", err);
 		goto out;
